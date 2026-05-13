@@ -97,6 +97,7 @@ export default function DashboardPage() {
     isLoading,
     isSubmitting,
     error,
+    usingMock,
     filters,
     setBrand,
     setSearch,
@@ -147,7 +148,18 @@ export default function DashboardPage() {
                 onLowStockClick={() => setShowLowOnly(true)}
               />
 
-              {/* Low stock alert banner (jika ada item kritis) */}
+          {/* Offline mode warning */}
+          {(usingMock as boolean) && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-3">
+              <span className="text-lg">⚠️</span>
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-amber-800">Mode Offline — Data Tidak Tersimpan</p>
+                <p className="text-xs text-amber-600 mt-0.5">
+                  Tidak dapat terhubung ke server. Perubahan stok tidak akan tersimpan ke database.
+                </p>
+              </div>
+            </div>
+          )}
               {alertItems.some((a) => a.status === 'HABIS') && (
                 <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-3">
                   <span className="text-lg">🚨</span>
