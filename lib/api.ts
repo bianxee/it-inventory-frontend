@@ -1,58 +1,98 @@
 // lib/api.ts
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+// Centralized API client dengan base URL dan error handling
 
-async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const url = `${BASE_URL}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
+import type {
+  StockListResponse,
+  AlertResponse,
+  StockOutPayload,
+  StockOutResponse,
+  FilterState,
+} from '@/types/inventory';
 
-  const res = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    ...options,
-  });
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1';
 
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.message || errorData.error || `HTTP Error ${res.status}`);
+// ─────────────────────────────────────────────────────────────
+// HELPER: Fetch wrapper dengan error normalization
+// ─────────────────────────────────────────────────────────────
+
+async function apiFetch<T>(
+  endpoint: string,
+  options?: RequestInit
+): Promise<T> {
+  const url = `${BASE_URL}${endpoint}`;
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      cache: 'no-store',   // ← hindari stale cache di Next.js production
+      ...options,
+    });
+  } catch (err) {
+    console.error('[API] Network error:', url, err);
+    throw new Error('NETWORK_ERROR');
   }
 
-  const data = await res.json();
-  return data;
+  const json = await res.json().catch(() => ({ success: false, error: 'Respons server tidak valid' }));
+
+  if (!res.ok || json.success === false) {
+    const message = json.error ?? json.message ?? `HTTP ${res.status}: ${res.statusText}`;
+    throw new Error(message);
+  }
+
+  return json as T;
 }
 
-// ==================== API FUNCTIONS ====================
+// ─────────────────────────────────────────────────────────────
+// API FUNCTIONS
+// ─────────────────────────────────────────────────────────────
 
-/** GET /stok - Ambil daftar produk */
-export async function fetchStock(filters: any = {}) {
+/**
+ * GET /stok — Ambil semua produk dengan filter opsional
+ */
+export async function fetchStock(filters?: Partial<FilterState>): Promise<StockListResponse> {
   const params = new URLSearchParams();
 
-  if (filters.search) params.append('search', filters.search);
-  if (filters.brand && filters.brand !== 'Semua') {
-    // Sesuaikan dengan logic backend kamu
-    params.append('brandId', filters.brand === 'HP' ? '1' : 
-                           filters.brand === 'Canon' ? '2' :
-                           filters.brand === 'Epson' ? '3' : '4');
-  }
-  if (filters.showLowOnly) params.append('threshold', '10'); // sesuaikan dengan backend
+  if (filters?.search)      params.set('search', filters.search);
+  if (filters?.brand && filters.brand !== 'all') params.set('brandId', String(brandNameToId(filters.brand)));
+  if (filters?.showLowOnly) params.set('lowStock', 'true');
+  params.set('limit', '100');
 
   const query = params.toString() ? `?${params.toString()}` : '';
-  return apiFetch(`/stok${query}`);
+  return apiFetch<StockListResponse>(`/stok${query}`);
 }
 
-/** POST /stok-keluar */
-export async function postStockOut(payload: any) {
-  return apiFetch('/stok-keluar', {
+/**
+ * GET /alert — Ambil item dengan stok menipis
+ */
+export async function fetchAlerts(): Promise<AlertResponse> {
+  return apiFetch<AlertResponse>('/alert');
+}
+
+/**
+ * POST /stok-keluar — Catat pengambilan barang
+ */
+export async function postStockOut(payload: StockOutPayload): Promise<StockOutResponse> {
+  return apiFetch<StockOutResponse>('/stok-keluar', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
 }
 
-/** GET /alert */
-export async function fetchAlerts() {
-  return apiFetch('/alert');
-}
+// ─────────────────────────────────────────────────────────────
+// HELPER: Map brand name → ID (sesuai seed data)
+// ─────────────────────────────────────────────────────────────
 
-/** GET /riwayat */
-export async function fetchHistory() {
-  return apiFetch('/riwayat');
+const BRAND_ID_MAP: Record<string, number> = {
+  HP: 1,
+  Canon: 2,
+  Epson: 3,
+  Brother: 4,
+};
+
+function brandNameToId(name: string): number {
+  return BRAND_ID_MAP[name] ?? 0;
 }

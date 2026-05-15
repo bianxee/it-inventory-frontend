@@ -23,8 +23,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="id" className={`${dmSans.variable} ${spaceMono.variable}`}>
-      <body className="font-sans antialiased bg-slate-50 text-slate-900">
+    <html lang="id" className={`${dmSans.variable} ${spaceMono.variable}`} suppressHydrationWarning>
+      <body className="font-sans antialiased bg-slate-50 text-slate-900" suppressHydrationWarning>
         <AuthProvider>
           {children}
         </AuthProvider>
